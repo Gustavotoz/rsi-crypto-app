@@ -2,127 +2,31 @@ import ccxt
 import pandas as pd
 import ta
 import streamlit as st
-import time
 
-# -------------------------------
-# CONFIGURAÇÃO BÁSICA
-# -------------------------------
-st.set_page_config(page_title="RSI Criptomoedas", layout="centered")
+st.title("📊 Analisador de RSI - Criptomoedas")
 
-# Opções de logos
-logos = {
-    "Bitcoin (BTC)": "https://cryptologos.cc/logos/bitcoin-btc-logo.png",
-    "Ethereum (ETH)": "https://cryptologos.cc/logos/ethereum-eth-logo.png",
-    "Binance Coin (BNB)": "https://cryptologos.cc/logos/binance-coin-bnb-logo.png",
-    "Ripple (XRP)": "https://cryptologos.cc/logos/xrp-xrp-logo.png",
-    "Solana (SOL)": "https://cryptologos.cc/logos/solana-sol-logo.png",
-    "Dogecoin (DOGE)": "https://cryptologos.cc/logos/dogecoin-doge-logo.png"
-}
+# Entrada do par de moedas
+par = st.text_input("Digite o par (ex: BTC/USDT)", value="BTC/USDT")
 
-# Opções de fundos
-fundos = {
-    "Financeiro Futurista": "https://images.unsplash.com/photo-1621508454937-3f7b4371e1f1?ixlib=rb-4.0.3&auto=format&fit=crop&w=1500&q=80",
-    "Gráfico de Velas": "https://images.unsplash.com/photo-1640332928566-0523f5d1f69a?ixlib=rb-4.0.3&auto=format&fit=crop&w=1500&q=80",
-    "Moedas Bitcoin": "https://images.unsplash.com/photo-1611078480168-218bdc95d9ef?ixlib=rb-4.0.3&auto=format&fit=crop&w=1500&q=80",
-    "Blockchain Tech": "https://images.unsplash.com/photo-1629886673629-46f38f61c395?ixlib=rb-4.0.3&auto=format&fit=crop&w=1500&q=80"
-}
-
-# -------------------------------
-# PAINEL DE CONFIGURAÇÃO
-# -------------------------------
-st.sidebar.header("⚙ Configurações do App")
-moeda = st.sidebar.selectbox("Escolha a moeda", list(logos.keys()))
-fundo = st.sidebar.selectbox("Escolha o fundo", list(fundos.keys()))
-par = st.sidebar.text_input("Par de criptomoeda", value="BTC/USDT")
-periodo = st.sidebar.number_input("Período RSI", value=14, step=1, min_value=2, max_value=50)
-intervalo_atualizacao = st.sidebar.selectbox("⏱ Atualização (segundos)", [10, 30, 60, 120], index=2)
-
-# Cores
-cor_inicio = st.sidebar.color_picker("🎨 Cor inicial (sobrevenda)", "#00FF00")
-cor_meio = st.sidebar.color_picker("🎨 Cor intermediária", "#FFFF00")
-cor_fim = st.sidebar.color_picker("🎨 Cor final (sobrecompra)", "#FF0000")
-
-# -------------------------------
-# CSS DINÂMICO
-# -------------------------------
-st.markdown(f"""
-    <style>
-    body {{
-        font-size: 18px;
-        background-image: url('{fundos[fundo]}');
-        background-size: cover;
-    }}
-    .stApp {{
-        background: rgba(0, 0, 0, 0.7);
-        padding: 20px;
-        border-radius: 15px;
-    }}
-    h1, h2, h3, label, p, .stMarkdown {{
-        color: white !important;
-    }}
-    </style>
-""", unsafe_allow_html=True)
-
-# -------------------------------
-# CABEÇALHO
-# -------------------------------
-st.image(logos[moeda], width=100)
-st.title(f"📊 RSI - {moeda}")
-
-# -------------------------------
-# FUNÇÃO PARA PEGAR DADOS
-# -------------------------------
+# Função para pegar dados da Binance
 def pegar_dados(par):
     exchange = ccxt.binance()
-    ohlcv = exchange.fetch_ohlcv(par, timeframe='1m', limit=200)
+    ohlcv = exchange.fetch_ohlcv(par, timeframe='1h', limit=200)  # candles de 1 hora
     df = pd.DataFrame(ohlcv, columns=['timestamp','open','high','low','close','volume'])
     df['timestamp'] = pd.to_datetime(df['timestamp'], unit='ms')
     return df
 
-# -------------------------------
-# LOOP DE ATUALIZAÇÃO
-# -------------------------------
-placeholder = st.empty()
-
-while True:
+# Calcular RSI
+if st.button("Analisar RSI"):
     try:
         df = pegar_dados(par)
-        df['RSI'] = ta.momentum.RSIIndicator(df['close'], window=periodo).rsi()
-        rsi_atual = df['RSI'].iloc[-1]
+        rsi = ta.momentum.RSIIndicator(df['close'], window=14).rsi().iloc[-1]
+        st.subheader(f"RSI Atual: {rsi:.2f}")
 
-        with placeholder.container():
-            st.subheader(f"RSI Atual: {rsi_atual:.2f}")
-
-            # Barra gradiente com marcador
-            st.markdown(
-                f"""
-                <div style="
-                    width: 100%;
-                    background: linear-gradient(to right, {cor_inicio} 0%, {cor_meio} 50%, {cor_fim} 100%);
-                    height: 30px;
-                    border-radius: 5px;
-                    position: relative;">
-                    <div style="
-                        position: absolute;
-                        left: {rsi_atual}%;
-                        top: -5px;
-                        width: 4px;
-                        height: 40px;
-                        background-color: white;
-                        border-radius: 2px;">
-                    </div>
-                </div>
-                """,
-                unsafe_allow_html=True
-            )
-
-            with st.expander("📈 Últimos dados"):
-                st.dataframe(df.tail(10))
-
-            st.info(f"⏳ Atualizando automaticamente a cada {intervalo_atualizacao} segundos...")
-
-        time.sleep(intervalo_atualizacao)
+        # Barra visual simples
+        cor = "green" if rsi < 30 else "red" if rsi > 70 else "yellow"
+        st.progress(min(max(rsi, 0), 100) / 100)  # barra 0-100
+        st.markdown(f"<p style='color:{cor};font-size:20px;'>Status: {'Sobrevenda' if rsi < 30 else 'Sobrecompra' if rsi > 70 else 'Neutro'}</p>", unsafe_allow_html=True)
 
     except Exception as e:
         st.error(f"Erro ao buscar dados: {e}")
-        time.sleep(intervalo_atualizacao)
