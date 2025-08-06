@@ -5,8 +5,14 @@ import streamlit as st
 
 st.title("📊 Analisador de RSI - Criptomoedas")
 
-# Entrada do par de moedas
-par = st.text_input("Digite o par (ex: BTC/USDT)", value="BTC/USDT")
+# Lista de pares populares
+pares_populares = [
+    "BTC/USDT", "ETH/USDT", "BNB/USDT", "XRP/USDT", "SOL/USDT",
+    "DOGE/USDT", "ADA/USDT", "MATIC/USDT", "DOT/USDT", "LTC/USDT"
+]
+
+# Seleção do par
+par = st.selectbox("Escolha o par de criptomoedas", pares_populares, index=0)
 
 # Função para pegar dados da Binance
 def pegar_dados(par):
